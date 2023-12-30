@@ -1,22 +1,4 @@
 function [message] = LoRa_Rx(signal,Bandwidth,SF,Coherece,Fs,df,varargin)
-% LoRa_Rx emulates a Lora receiver
-%
-%   in:  signal       payload message
-%        Bandwidth    signal bandwidth of LoRa transmisson  
-%        SF           spreading factor
-%        Coherence    (1) coherent or (2) non-coherent FSK Detection
-%        Fs           sampling frequency
-%        dF           carrier frequency shift
-%        varagin{1}   SNR
-%        varagin{2}   Preamble Symbol number
-%
-%  out:  message       LoRa payload message chahracters
-%        symbols_Demod LoRa payload symbols vector  
-%
-% Dr Bassel Al Homssi  
-% RMIT University 
-% Credit to rpp0 on https://github.com/rpp0/gr-lora
-
 if nargin == 6
     SNR                 = Inf ;
     n_preamble          = 8 ;
@@ -45,18 +27,8 @@ catch
 end
 end
 function [SymbolsMessage,SymbolsDemod,NPreamb] = LoRa_Demodulate_Full(signal,SF,Bandwidth,Coherece,n_preamble)
-% LoRa_Demodulate_Full demodulates full LoRa packet
-%
-%   in:  signal         IQ LoRa signal containing 
-%                       (preamble + sync header + payload)
-%        SF             spreading factor   
-%        Bandwidth      signal bandwidth of LoRa transmisson  
-%        Coherence      type of demodulation (coherent or non-coherent)
-%
-%  out:  symbols_message          message symbols vector (encoded)
-%        symbols_Demod            LoRa symbols vector
-%        n_preamble               Number of symbols in preamble
-%% Return if SF is not in the range
+
+
 if SF > 12 || SF < 7
     return
 end
@@ -91,16 +63,8 @@ SymbolsDemod    = FSKDetection(MessageSignal,SF,Coherece) ;
 SymbolsMessage  = mod(SymbolsDemod - symbol_offset,2^SF) ;
 end
 function [y] = loramod(x,SF,BW,fs,varargin)
-% loramod LoRa modulates a symbol vector specified by x
-%
-%   in:  x          1xN symbol vector wher N=1-Inf 
-%                   with values {0,1,2,...,2^(SF)-1}
-%        BW         signal bandwidth of LoRa transmisson  
-%        SF         spreading factor   
-%        Fs         sampling frequency
-%        varargin{1} set polarity of chirp
-%
-%  out:  y          LoRa IQ waveform
+
+
 if (nargin < 4)
     error(message('comm:pskmod:numarg1'));
 end
@@ -116,23 +80,27 @@ end
 
 M       = 2^SF ;
 
-% Check that M is a positive integer
+
+
 if (~isreal(M) || ~isscalar(M) || M<=0 || (ceil(M)~=M) || ~isnumeric(M))
     error(message('comm:pskmod:Mreal'));
 end
 
-% Check that x is within range
+
+
 if ((min(min(x)) < 0) || (max(max(x)) > (M-1)))
     error(message('comm:pskmod:xreal2'));
 end
 
-% Polarity of Chirp
+
+
 if nargin == 4
     Inv = 1 ;
 elseif nargin == 5
     Inv = varargin{1} ;
 end
-% Symbol Constants
+
+
 Ts      = 2^SF/BW ;
 Ns      = fs.*M/BW ;
 
@@ -146,70 +114,68 @@ Theta   = cumtrapz(time,Inv.*freq) ;
 y       = reshape(exp(j.*2.*pi.*Theta),numel(Theta),1) ;
 end
 function [message_full,CR_pld,pld_length,CRC_pld] = LoRa_Decode_Full(symbols_message,SF)
-% LoRa_Decode_Full decodes full payload packet
-%
-%   in:  symbols_message         LoRa payload symbol vector
-%        SF                      spreading factor  
-%
-%  out:  message_full          message symbols vector (decoded)
-%        CR_pld                code rate of payload
-%        pld_length            length of payload
-%        CRC_pld               payload cyclic rate code flag
-%% Decode Header
+
+
 rdd_hdr         = 4 ;
 ppm_hdr         = SF - 2 ;
 symbols_hdr     = mod(round(symbols_message(1:8)/4),2^ppm_hdr) ;
-% Graying
+
+
 symbols_hdr_gry = LoRa_decode_gray(symbols_hdr) ;
-% Interleaving
+
+
 symbols_hdr_int = LoRa_decode_interleave(symbols_hdr_gry,ppm_hdr,rdd_hdr) ;
-% Shuffle
+
+
 symbols_hdr_shf = LoRa_decode_shuffle(symbols_hdr_int,ppm_hdr) ;
-% Hamming
+
+
 symbols_hdr_fec = LoRa_decode_hamming(symbols_hdr_shf(1:5),rdd_hdr) ;
-%% Extract info from Header
+
+
 CR_pld          = floor(bitsra(symbols_hdr_fec(2),5)) ;
 if CR_pld > 4 || CR_pld < 1
     return
 end
 CRC_pld         = mod(floor(bitsra(symbols_hdr_fec(2),4)),2) ;
 pld_length      = symbols_hdr_fec(1) + CRC_pld*2 ;
-%% Decode Payload
+
+
 rdd_pld         = CR_pld ;
 ppm_pld         = SF ;
 symbols_pld     = symbols_message(9:end) ;
-% Graying
+
+
 symbols_pld_gry = LoRa_decode_gray(symbols_pld) ;
-% Interleaving
+
+
 symbols_pld_int = LoRa_decode_interleave(symbols_pld_gry,ppm_pld,rdd_pld) ;
-% Shuffle
+
+
 symbols_pld_shf = LoRa_decode_shuffle(symbols_pld_int,length(symbols_pld_int)) ;
-% Add part of header
+
+
 symbols_pld_hdr = [(SF>7).*symbols_hdr_shf(end - SF + 8:end) symbols_pld_shf] ;
-% White
+
+
 symbols_pld_wht = LoRa_decode_white(symbols_pld_hdr,rdd_pld,0) ;
-% Hamming
+
+
 symbols_pld_fec = LoRa_decode_hamming(symbols_pld_wht,rdd_pld) ;
-% Swaping
+
+
 symbols_pld_fin = LoRa_decode_swap(symbols_pld_fec) ;
-%% Final Message
+
+
 message_full    = [symbols_hdr_fec symbols_pld_fin] ;
 end
 function [symbols_gray] = LoRa_decode_gray(symbols)
-% LoRa_decode_gray degray LoRa payload
-%
-%   in:  symbols       symbols with graying
-%
-%  out:  symbols_gray  degrayed symbols
+
+
 symbols_gray = bitxor(symbols,floor(bitsra(symbols,1))) ;
 end
 function [deocded] = LoRa_decode_hamming(symbols,CR)
-% LoRa_decode_hamming LoRa payload hamming decode (4,4 + CR)
-%
-%   in:  symbols       symbols with hamming
-%        CR            Code Rate
-%
-%  out:  deocded      Fully decoded payload symbols
+
 
 if CR > 2 && CR <= 4 % detection and correction
     n = ceil(length(symbols).*4/(4 + 4)) ;
@@ -255,13 +221,8 @@ elseif CR > 0 && CR <= 2 % detection
 end
 end
 function [symbols_interleaved] = LoRa_decode_interleave(symbols,ppm,rdd)
-% LoRa_decode_interleave deinterleaves payload packet
-%
-%   in:  symbols       interleaved symbols
-%        ppm
-%        rdd
-%
-%  out:  symbols_interleaved  deinterleaved symbols
+
+
 
 symbols_interleaved = [] ;
 sym_idx_ext = 1 ;
@@ -282,12 +243,8 @@ for block_idx = 1 : floor(length(symbols)/(4+rdd))
 end
 end
 function [symbols_shuf] = LoRa_decode_shuffle(symbols,N)
-% LoRa_decode_shuffle unshuffles payload packet
-%
-%   in:  symbols       symbol vector
-%        N             
-%
-%  out:  symbols_shuf  unshuffled symbols
+
+
 
 pattern = [5 0 1 2 4 3 6 7] ;
 symbols_shuf = zeros(1,N) ;
@@ -298,11 +255,8 @@ for ctr = 1 : N
 end
 end
 function [symbols_swp] = LoRa_decode_swap(symbols)
-% LoRa_decode_shuffle swap payload packet
-%
-%   in:  symbols       symbol vector           
-%
-%  out:  symbols_swp   unswapped symbols
+
+
 
 symbols_swp = zeros(1,length(symbols)) ;
 for ctr = 1 : length(symbols)
@@ -310,13 +264,8 @@ for ctr = 1 : length(symbols)
 end
 end
 function [symbols_white] = LoRa_decode_white(symbols,CR,DE)
-% LoRa_decode_white dewhitening of payload packet
-%
-%   in:  symbols       whitened symbols
-%        CR            code rate
-%        DE            data rate optimization flag
-%
-%  out:  symbols_white  dewhitened symbols
+
+
 
 if DE == 0
     if CR > 2 && CR <= 4
@@ -381,13 +330,8 @@ N = min([length(symbols) length(white_sequence)]) ; % LoRa symbol length
 symbols_white = bitxor(symbols(1:N),white_sequence(1:N)) ;
 end
 function [y] = rotl(bits,count,size)
-% rotl 
-%
-%   in:  bits            bit sequence
-%        counts          
-%        size
-%
-%  out:  y               rotated symbols
+
+
 
 len_mask = bitsll(1,size) - 1 ;
 count = mod(count,size) ;
@@ -395,12 +339,8 @@ bits = bitand(bits,len_mask) ;
 y = bitor(bitand(bitsll(bits,count),len_mask), floor(bitsra(bits,size - count))) ;
 end
 function [r] = selectbits(data,indices)
-% selectbits concat zeros (from 4-bit to 8-bit)
-%
-%   in:  data            symbol sequence
-%        indices         vector = [1 2 3 4 5]
-%
-%  out:  r       `        symbols 
+
+
 
 r = 0 ;
 for ctr = 0 : length(indices) - 1
@@ -412,14 +352,8 @@ for ctr = 0 : length(indices) - 1
 end
 end
 function [symbols] = FSKDetection(signal,SF,detection)
-% LoRa_Tx demodulates a Lora de-chirped signal using
-% the coherence specified by the detection variable
-%
-%   in:  message      payload message
-%        SF           spreading factor
-%        detection    1= coherent detection, 2= non-coherent detection   
-%
-%  out:  symbols      FSK demodulated symbol vector 
+
+
 
 if detection == 1 % coherent detection
     t = 0:1/(2^SF):0.999 ; % time vector
