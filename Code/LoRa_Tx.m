@@ -1,22 +1,6 @@
 function [signal_mod] = LoRa_Tx(message,Bandwidth,SF,Pt,Fs,df,varargin)
-% LoRa_Tx emulates a Lora transmission
-%
-%   in:  message      payload message
-%        Bandwidth    signal bandwidth of LoRa transmisson  
-%        SF           spreading factor
-%        Pt           transmit power in deicbels
-%        Fs           sampling frequency
-%        dF           frequency offset
-%        varargin{1}  code rate
-%        varargin{2}  symbols in preamble
-%        varargin{3}  sync key
-%
-%  out:  signal       LoRa IQ waveform
-%        packet       encoded message
-%
-% Dr Bassel Al Homssi  
-% RMIT University 
-% Credit to rpp0 on https://github.com/rpp0/gr-lora
+
+
 
 if nargin == 6
     CR = 1 ;
@@ -41,13 +25,7 @@ signal = LoRa_Modulate_Full(packet,SF,Bandwidth,n_preamble,SyncKey,Fs) ; % LoRa 
 signal_mod = 10.^(Pt./20).*signal.*exp(-j.*2.*pi.*df/Fs.*(0:length(signal)-1))' ; % frquency shift and convert to power
 end
 function [packet] = LoRa_Encode_Full(message,SF,CR)
-% LoRa_Encode_Full emulates a Lora transmission
-%
-%   in:  message      payload message
-%        SF           spreading factor
-%        CR           coding rate 
-%
-%  out:  packet       encoded lora packet 
+
 
 CRC_pld = 1 ;  % cyclic rate code flag
 imp = 0 ;
@@ -90,11 +68,8 @@ packet_hdr_gray = LoRa_encode_gray(packet_hdr_int) ;
 packet = [4*packet_hdr_gray packet_pld_gray] ;
 end
 function [symbols_swp] = LoRa_encode_swap(symbols)
-% LoRa_encode_swap swaps nibbles
-%
-%   in:  symbols            symbol sequence
-%
-%  out:  symbols_swp        symbols with swapped nibbles
+
+
 
 symbols_swp = zeros(1,length(symbols)) ;
 for ctr = 1 : length(symbols)
@@ -102,12 +77,8 @@ for ctr = 1 : length(symbols)
 end
 end
 function [encoded] = LoRa_encode_hamming(symbols,CR)
-% LoRa_encode_hamming hamming encodes symbols to ensure a more accurate decoding
-%
-%   in:  symbols      symmbol sequence
-%        CR           hamming coding rate 
-%
-%  out:  encoded      hamming encoded symbols
+
+
 
 if CR > 2 && CR <= 4 % detection and correction
     n = floor(length(symbols).*(4 + 4)/4) ;
